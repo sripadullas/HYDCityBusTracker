@@ -1,0 +1,305 @@
+import React, { useMemo, useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, MapPinned, Route, Upload, Layers, Bus, Train, Clock3, Network, Filter, Navigation } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+/**
+ * Hyderabad Metro + Bus GTFS Explorer Pro
+ * --------------------------------------------------
+ * Production-style frontend scaffold for:
+ * - Hyderabad city bus + metro GTFS explorer
+ * - Spider-style route and stop exploration
+ * - Route/stop/trip search
+ * - GTFS multi-mode filtering (Bus / Metro)
+ * - Ready for Leaflet / MapLibre + GTFS parser
+ *
+ * NEXT STEPS TO MAKE FULLY LIVE:
+ * 1. Add xlsx/zip parser (xlsx + jszip + papaparse)
+ * 2. Parse GTFS sheets/files into app state
+ * 3. Add Leaflet map rendering for stops + paths
+ * 4. Generate spider graph from stop-route adjacency
+ */
+
+const sampleRoutes = [
+  { id: '1', shortName: 'MGBS-BLUE', longName: 'Miyapur – Ameerpet – LB Nagar', mode: 'Metro', stops: 27, color: '#2563eb' },
+  { id: '2', shortName: 'MGBS-RED', longName: 'JBS Parade Ground – MGBS', mode: 'Metro', stops: 15, color: '#dc2626' },
+  { id: '3', shortName: '49M', longName: 'Miyapur – Ameerpet – Lakdikapul', mode: 'Bus', stops: 31, color: '#059669' },
+  { id: '4', shortName: '218', longName: 'Patancheru – Lingampally – Mehdipatnam', mode: 'Bus', stops: 37, color: '#f59e0b' },
+  { id: '5', shortName: '10H', longName: 'ECIL – Tarnaka – Secunderabad', mode: 'Bus', stops: 28, color: '#7c3aed' },
+];
+
+const sampleStops = [
+  { id: 's1', name: 'Secunderabad', lat: 17.4399, lon: 78.4983, modes: ['Bus', 'Metro'], routes: ['10H', 'MGBS-RED'] },
+  { id: 's2', name: 'Ameerpet', lat: 17.4374, lon: 78.4482, modes: ['Bus', 'Metro'], routes: ['49M', 'MGBS-BLUE'] },
+  { id: 's3', name: 'MGBS', lat: 17.3797, lon: 78.4867, modes: ['Bus', 'Metro'], routes: ['MGBS-RED'] },
+  { id: 's4', name: 'Mehdipatnam', lat: 17.3984, lon: 78.4347, modes: ['Bus'], routes: ['218'] },
+  { id: 's5', name: 'LB Nagar', lat: 17.3456, lon: 78.5523, modes: ['Metro', 'Bus'], routes: ['MGBS-BLUE'] },
+];
+
+function StatCard({ title, value, icon: Icon, subtitle }) {
+  return (
+    <Card className="rounded-2xl shadow-sm border-0 bg-white/80 backdrop-blur">
+      <CardContent className="p-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-500">{title}</p>
+          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+        </div>
+        <div className="p-3 rounded-2xl bg-slate-100">
+          <Icon className="w-6 h-6 text-slate-700" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function HyderabadGTFSExplorerPro() {
+  const [query, setQuery] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState(sampleRoutes[0]);
+  const [selectedStop, setSelectedStop] = useState(sampleStops[0]);
+  const [gtfsLoaded, setGtfsLoaded] = useState(false);
+  const [modeFilter, setModeFilter] = useState('All');
+  const [view, setView] = useState('network');
+
+  const filteredRoutes = useMemo(() => {
+    return sampleRoutes.filter((r) => {
+      const q = `${r.shortName} ${r.longName}`.toLowerCase().includes(query.toLowerCase());
+      const m = modeFilter === 'All' || r.mode === modeFilter;
+      return q && m;
+    });
+  }, [query, modeFilter]);
+
+  const filteredStops = useMemo(() => {
+    return sampleStops.filter((s) => {
+      const q = s.name.toLowerCase().includes(query.toLowerCase());
+      const m = modeFilter === 'All' || s.modes.includes(modeFilter);
+      return q && m;
+    });
+  }, [query, modeFilter]);
+
+  const stats = {
+    routes: gtfsLoaded ? '1,103' : '1,103',
+    stops: gtfsLoaded ? '4,999' : '4,999',
+    trips: gtfsLoaded ? '36,704' : '36,704',
+    stopTimes: gtfsLoaded ? '924,688' : '924,688',
+  };
+
+  const handleGTFSUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    console.log('GTFS / Excel file selected:', file.name);
+    // TODO:
+    // - Parse .xlsx workbook or GTFS .zip
+    // - Extract routes, stops, trips, stop_times, shapes
+    // - Build stop adjacency and route graph
+    setGtfsLoaded(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between"
+        >
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Badge className="rounded-xl bg-cyan-600 hover:bg-cyan-600">Hyderabad City</Badge>
+              <Badge variant="secondary" className="rounded-xl">Metro + Bus</Badge>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Hyderabad Transit Explorer Pro</h1>
+            <p className="text-slate-600 mt-1">
+              GTFS-powered network explorer for Hyderabad Metro and City Bus connectivity.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <label className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white cursor-pointer hover:opacity-90 transition">
+              <Upload className="w-4 h-4" />
+              Upload GTFS / XLSX
+              <input type="file" accept=".zip,.xlsx,.xls" className="hidden" onChange={handleGTFSUpload} />
+            </label>
+            <Button variant="outline" className="rounded-2xl">Load Hyderabad Feed</Button>
+          </div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard title="Routes" value={stats.routes} icon={Route} subtitle="Bus + Metro combined" />
+          <StatCard title="Stops" value={stats.stops} icon={MapPinned} subtitle="Stations and bus stops" />
+          <StatCard title="Trips" value={stats.trips} icon={Bus} subtitle="Scheduled trips" />
+          <StatCard title="Feed Status" value={gtfsLoaded ? 'Loaded' : 'Ready'} icon={Clock3} subtitle="Excel / GTFS supported" />
+        </div>
+
+        <Card className="rounded-3xl border-0 shadow-sm bg-white/80 backdrop-blur">
+          <CardContent className="p-4 md:p-5 flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search routes, stations, bus stops, corridors, or trip patterns..."
+                className="pl-10 h-12 rounded-2xl border-slate-200"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Select value={modeFilter} onValueChange={setModeFilter}>
+                <SelectTrigger className="w-[180px] h-12 rounded-2xl">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Modes</SelectItem>
+                  <SelectItem value="Bus">Bus Only</SelectItem>
+                  <SelectItem value="Metro">Metro Only</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={view} onValueChange={setView}>
+                <SelectTrigger className="w-[180px] h-12 rounded-2xl">
+                  <Network className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="View" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="network">Network View</SelectItem>
+                  <SelectItem value="map">Map View</SelectItem>
+                  <SelectItem value="spider">Spider View</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          <div className="xl:col-span-3 space-y-6">
+            <Card className="rounded-3xl border-0 shadow-sm bg-white/80">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5" /> Explorer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="routes" className="w-full">
+                  <TabsList className="grid grid-cols-2 rounded-2xl w-full">
+                    <TabsTrigger value="routes">Routes</TabsTrigger>
+                    <TabsTrigger value="stops">Stops</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="routes" className="mt-4 space-y-3 max-h-[560px] overflow-auto pr-1">
+                    {filteredRoutes.map((route) => (
+                      <button
+                        key={route.id}
+                        onClick={() => setSelectedRoute(route)}
+                        className={`w-full text-left p-4 rounded-2xl border transition ${selectedRoute.id === route.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50 border-slate-200'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ background: route.color }} />
+                              <p className="font-semibold">{route.shortName}</p>
+                            </div>
+                            <p className={`text-sm mt-1 ${selectedRoute.id === route.id ? 'text-slate-200' : 'text-slate-500'}`}>{route.longName}</p>
+                          </div>
+                          <Badge variant="secondary" className="rounded-xl">{route.mode}</Badge>
+                        </div>
+                      </button>
+                    ))}
+                  </TabsContent>
+
+                  <TabsContent value="stops" className="mt-4 space-y-3 max-h-[560px] overflow-auto pr-1">
+                    {filteredStops.map((stop) => (
+                      <button
+                        key={stop.id}
+                        onClick={() => setSelectedStop(stop)}
+                        className={`w-full text-left p-4 rounded-2xl border transition ${selectedStop.id === stop.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50 border-slate-200'}`}
+                      >
+                        <p className="font-semibold">{stop.name}</p>
+                        <p className={`text-sm mt-1 ${selectedStop.id === stop.id ? 'text-slate-200' : 'text-slate-500'}`}>
+                          Modes: {stop.modes.join(', ')}
+                        </p>
+                      </button>
+                    ))}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-0 shadow-sm bg-white/80">
+              <CardHeader>
+                <CardTitle>Selected Route</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    {selectedRoute.mode === 'Metro' ? <Train className="w-5 h-5" /> : <Bus className="w-5 h-5" />}
+                    <p className="text-2xl font-bold">{selectedRoute.shortName}</p>
+                  </div>
+                  <p className="text-slate-600">{selectedRoute.longName}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-xl">{selectedRoute.mode}</Badge>
+                  <Badge variant="secondary" className="rounded-xl">{selectedRoute.stops} Stops</Badge>
+                </div>
+                <Button className="w-full rounded-2xl">Open Spider View</Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="xl:col-span-9 space-y-6">
+            <Card className="rounded-3xl border-0 shadow-sm bg-white/80 overflow-hidden">
+              <CardHeader>
+                <CardTitle>Interactive Hyderabad Transit Network</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[520px] rounded-3xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center p-6">
+                  <Navigation className="w-14 h-14 text-slate-400 mb-4" />
+                  <h3 className="text-xl font-semibold">Map / Spider Network Placeholder</h3>
+                  <p className="text-slate-500 max-w-2xl mt-2">
+                    Connect Leaflet or MapLibre here to render Hyderabad Metro corridors, city bus routes, interchange hubs, stop clusters, and spider-style connectivity.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2 justify-center">
+                    <Badge className="rounded-xl">stops.txt</Badge>
+                    <Badge className="rounded-xl">routes.txt</Badge>
+                    <Badge className="rounded-xl">trips.txt</Badge>
+                    <Badge className="rounded-xl">stop_times.txt</Badge>
+                    <Badge variant="secondary" className="rounded-xl">shapes.txt optional</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="rounded-3xl border-0 shadow-sm bg-white/80">
+                <CardHeader>
+                  <CardTitle>Selected Stop</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-xl font-semibold">{selectedStop.name}</p>
+                  <p className="text-slate-600">Lat: {selectedStop.lat} | Lon: {selectedStop.lon}</p>
+                  <p className="text-slate-600">Modes: {selectedStop.modes.join(', ')}</p>
+                  <p className="text-slate-600">Serving Routes: {selectedStop.routes.join(', ')}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-0 shadow-sm bg-white/80">
+                <CardHeader>
+                  <CardTitle>Build Checklist</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-slate-600">
+                  <p>• Parse Excel GTFS workbook directly</p>
+                  <p>• Auto-detect Metro vs Bus routes</p>
+                  <p>• Create stop-route spider graph</p>
+                  <p>• Render interchanges and transfer hubs</p>
+                  <p>• Add Hyderabad-specific branding and route colors</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
